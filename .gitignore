@@ -1,0 +1,8 @@
+# Git Ignore List
+
+# Python and iPython
+.ipynb_checkpoints
+__pycache__
+
+# Data Files
+/data/**/*.db
