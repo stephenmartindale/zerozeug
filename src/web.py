@@ -37,11 +37,17 @@ def fetch_index():
         if (len(cells) != 6):
             continue
 
+        try:
+            uploadDate = datetime.strptime(cells[1].string.strip(), '%Y-%m-%d %H:%M')
+        except:
+            continue
+
         a = cells[2]('a')
         id = network_id(a[0]['href'])
 
         networks[id] = {
             'id': id,
+            'upload_date': uploadDate,
             'promoted': True
         }
 
@@ -79,14 +85,20 @@ def fetch_index():
         if not (challenger in networks):
             networks[challenger] = {
                 'id': challenger,
+                'upload_date': startDate,
                 'promoted': False
             }
+        elif not networks[challenger]['promoted'] and (startDate < networks[challenger]['upload_date']):
+            networks[challenger]['upload_date'] = startDate
 
         if not (defender in networks):
             networks[defender] = {
-                'id': challenger,
+                'id': defender,
+                'upload_date': startDate,
                 'promoted': False
             }
+        elif not networks[defender]['promoted'] and (startDate < networks[defender]['upload_date']):
+            networks[defender]['upload_date'] = startDate
 
         matches[id] = {
             'id': id,
@@ -167,6 +179,7 @@ def fetch_database(db_path):
                                                                      '(2, "white")')
 
             sql.execute('CREATE TABLE Network(id char(64) primary key not null,'
+                                             'upload_date datetime not null,'
                                              'promoted boolean not null default false)')
 
             sql.execute('CREATE TABLE Match(id char(24) primary key not null,'
@@ -212,9 +225,9 @@ def fetch_database(db_path):
         for id in networks:
             exists = sql.execute("SELECT EXISTS(SELECT id FROM Network WHERE id=? LIMIT 1)", [id]).fetchone()
             if not (exists[0]):
-                sql.execute('INSERT INTO Network(id, promoted) VALUES(?, ?)', (id, networks[id]['promoted']))
+                sql.execute('INSERT INTO Network(id, upload_date, promoted) VALUES(?, ?, ?)', (id, networks[id]['upload_date'], networks[id]['promoted']))
             else:
-                sql.execute('UPDATE Network SET promoted=? WHERE id=?', (networks[id]['promoted'], id))
+                sql.execute('UPDATE Network SET upload_date=?, promoted=? WHERE id=?', (networks[id]['upload_date'], networks[id]['promoted'], id))
 
         # Populate or Update the tables of Matches and Games
         print('Storing Matches ...')
