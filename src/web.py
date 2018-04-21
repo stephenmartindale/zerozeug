@@ -189,6 +189,20 @@ def fetch_database(db_path):
             print('Connecting to Sqlite Database ...')
             sql = sqlite3.connect(db_path)
 
+        # Drop all Views in the Database
+        print('Updating Database Views ...')
+        view_cursor = sql.execute("SELECT name FROM sqlite_master WHERE type = 'view'")
+        for view_name in view_cursor:
+            sql.execute("DROP VIEW [" + view_name[0] + "]")
+
+        # Create all Views
+        with open(os.path.join(os.path.dirname(__file__), 'views.sql'), 'r') as f:
+            view_script = f.read()
+
+        sql.executescript(view_script)
+
+        print()
+
         # Fetch the index of matches from the Leela Zero training-graph page
         print('Fetching networks and matches ...')
         (networks, matches) = fetch_index()
@@ -202,26 +216,33 @@ def fetch_database(db_path):
             else:
                 sql.execute('UPDATE Network SET promoted=? WHERE id=?', (networks[id]['promoted'], id))
 
-        # Populate or Update the table of Matches
+        # Populate or Update the tables of Matches and Games
         print('Storing Matches ...')
-        for id in matches:
-            exists = sql.execute("SELECT EXISTS(SELECT id FROM Match WHERE id=? LIMIT 1)", [id]).fetchone()
-            if not (exists[0]):
-                sql.execute('INSERT INTO Match(id, start_date, result, challenger, defender) VALUES(?, ?, ?, ?, ?)', (id, matches[id]['start_date'], matches[id]['result'], matches[id]['challenger'], matches[id]['defender']))
-            else:
-                sql.execute('UPDATE Match SET result=? WHERE id=?', (matches[id]['result'], id))
-
-        # Populate or Update the table of Games
-        print('Fetching & Storing Game Results ...')
         for match_id in matches:
-            games = fetch_match_index(matches[match_id])
-            matches[match_id]['games'] = games
+            match = matches[match_id]
+            existence_record = sql.execute('SELECT id as match_id, EXISTS(SELECT id FROM Game WHERE match_id=Match.id LIMIT 1) as has_games, (result is not null) as has_result FROM Match WHERE Match.id=?', [match_id]).fetchone()
+            if (None == existence_record):
+                sql.execute('INSERT INTO Match(id, start_date, result, challenger, defender) VALUES(?, ?, ?, ?, ?)', (match_id, match['start_date'], match['result'], match['challenger'], match['defender']))
+
+            else:
+                (_, has_games, has_result) = existence_record
+                if has_games and has_result:
+                    continue
+                elif (None != match['result']) and not has_result:
+                    sql.execute('UPDATE Match SET result=? WHERE id=?', (match['result'], match_id))
+
+            print('Fetching Games: ' + match_id + ' ...')
+            games = fetch_match_index(match)
+            match['games'] = games
+
+            print('Storing Games: ' + match_id + ' ...')
             for game_id in games:
                 exists = sql.execute("SELECT EXISTS(SELECT id FROM Game WHERE id=? LIMIT 1)", [game_id]).fetchone()
                 if not (exists[0]):
                     sql.execute('INSERT INTO Game(id, match_id, client, black, white, moves, victor, resign) VALUES(?, ?, ?, ?, ?, ?, ?, ?)', (game_id, match_id, games[game_id]['client'], games[game_id]['black'], games[game_id]['white'], games[game_id]['moves'], games[game_id]['victor'], games[game_id]['resign']))
 
         # Commit the Transaction
+        print()
         sql.commit()
         print('Transaction committed successfully.')
 
