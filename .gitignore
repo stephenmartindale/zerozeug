@@ -6,3 +6,4 @@ __pycache__
 
 # Data Files
 /data/**/*.db
+/data/**/*.db.bak
