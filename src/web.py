@@ -197,6 +197,11 @@ def fetch_database(db_path):
                                           'victor int not null references [Stone](stone) on delete no action,'
                                           'resign bool not null)')
 
+            sql.execute('CREATE TABLE SelfPlay(id char(32) primary key not null,'
+                                              'network char(64) not null references [Network](id) on delete no action,'
+                                              'victor int not null references [Stone](stone) on delete no action,'
+                                              'resign bool not null)')
+
         else:
             # Connect to the Database and assume that the Schema is valid
             print('Connecting to Sqlite Database ...')
