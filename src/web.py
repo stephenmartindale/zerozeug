@@ -197,10 +197,9 @@ def fetch_database(db_path):
                                           'victor int not null references [Stone](stone) on delete no action,'
                                           'resign bool not null)')
 
-            sql.execute('CREATE TABLE SelfPlay(id char(32) primary key not null,'
-                                              'network char(64) not null references [Network](id) on delete no action,'
-                                              'victor int not null references [Stone](stone) on delete no action,'
-                                              'resign bool not null)')
+            sql.execute('CREATE TABLE SelfPlay(network_id char(64) primary key not null references [Network](id) on delete no action,'
+                                              'black_victories int not null,'
+                                              'white_victories int not null)')
 
         else:
             # Connect to the Database and assume that the Schema is valid
