@@ -19,6 +19,9 @@ def match_uri(id):
 def network_id(href):
     return href[(href.rfind('/') + 1):href.rfind('.gz')]
 
+def match_game_id(href):
+    return href[(href.rfind('/') + 1):href.rfind('.sgf')]
+
 def sgf_uri(hash):
     return urllib.parse.urljoin(uri, '/viewmatch/' + hash + '.sgf')
 
@@ -34,7 +37,7 @@ def fetch_index():
     networks = {}
     for tr in networkTable('tr'):
         cells = tr('td')
-        if (len(cells) != 6):
+        if (len(cells) != 7):
             continue
 
         try:
@@ -124,10 +127,10 @@ def fetch_match_index(match):
         games = {}
         for row in matchTable('tr'):
             cells = row('td')
-            if (len(cells) != 6):
+            if (len(cells) != 10):
                 continue
 
-            outcome = cells[3].string.strip()
+            outcome = cells[4].string.strip()
             if (outcome.startswith('B')):
                 victor = go.Stone.Black
             elif (outcome.startswith('W')):
@@ -135,7 +138,7 @@ def fetch_match_index(match):
             else:
                 continue
 
-            winner = cells[2].string.strip()
+            winner = cells[3].string.strip()
             if (challenger.startswith(winner)):
                 black = challenger if (victor == go.Stone.Black) else defender
                 white = challenger if (victor == go.Stone.White) else defender
@@ -145,15 +148,15 @@ def fetch_match_index(match):
             else:
                 continue
 
-            id = cells[1].string.strip()
+            id = match_game_id(cells[7]('a')[0]['href'])
 
             games[id] = {
                 'id': id,
                 'match_id': match_id,
-                'client': int(cells[0].string.strip()),
+                'client': int(cells[8].string.strip()),
                 'black': black,
                 'white': white,
-                'moves': int(cells[4].string.strip()),
+                'moves': int(cells[5].string.strip()),
                 'victor': victor,
                 'resign': outcome.endswith('Resign')
             }
