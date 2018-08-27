@@ -9,6 +9,11 @@ from bs4 import BeautifulSoup
 
 uri = 'http://zero.sjeng.org/'
 
+requestHeaders = {
+    'Cache-Control': 'max-age=0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.183 Safari/537.36 Vivaldi/1.96.1147.64',
+    'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+}
 
 def match_id(href):
     return href[(href.rfind('/') + 1):]
@@ -25,12 +30,24 @@ def match_game_id(href):
 def sgf_uri(hash):
     return urllib.parse.urljoin(uri, '/viewmatch/' + hash + '.sgf')
 
+# Fetch any given URI with proxy-awareness and browser-like request headers
+def fetch_uri(uri):
+    request = urllib.request.Request(uri, data=None, headers=requestHeaders)
+    environmentProxies = urllib.request.getproxies()
+    if 'http' in environmentProxies:
+        proxyHandler = urllib.request.ProxyHandler({'http': environmentProxies['http']})
+        urlOpener = urllib.request.build_opener(proxyHandler)
+        with urlOpener.open(request) as response:
+            return BeautifulSoup(response.read(), "html5lib")
+
+    else:
+        with urllib.request.urlopen(request) as response:
+            return BeautifulSoup(response.read(), "html5lib")
 
 # Fetch the index of matches from the Leela Zero training-graph page
 def fetch_index():
     # Fetch the Leela Zero Index Page
-    with urllib.request.urlopen(uri) as r:
-        leelaIndex = BeautifulSoup(r.read(), "html5lib")
+    leelaIndex = fetch_uri(uri)
 
     # Table of Networks
     networkTable = leelaIndex.select('table.networks-table')[0]
@@ -117,51 +134,50 @@ def fetch_index():
 # Fetch the index of match-games for a given match
 def fetch_match_index(match):
     match_id = match['id']
-    with urllib.request.urlopen(match_uri(match_id)) as r:
-        matchIndex = BeautifulSoup(r.read(), "html5lib")
-        matchTable = matchIndex.select('table#sort')[0]
+    matchIndex = fetch_uri(match_uri(match_id))
+    matchTable = matchIndex.select('table#sort')[0]
 
-        challenger = match['challenger']
-        defender = match['defender']
+    challenger = match['challenger']
+    defender = match['defender']
 
-        games = {}
-        for row in matchTable('tr'):
-            cells = row('td')
-            if (len(cells) != 10):
-                continue
+    games = {}
+    for row in matchTable('tr'):
+        cells = row('td')
+        if (len(cells) != 10):
+            continue
 
-            outcome = cells[4].string.strip()
-            if (outcome.startswith('B')):
-                victor = go.Stone.Black
-            elif (outcome.startswith('W')):
-                victor = go.Stone.White
-            else:
-                continue
+        outcome = cells[4].string.strip()
+        if (outcome.startswith('B')):
+            victor = go.Stone.Black
+        elif (outcome.startswith('W')):
+            victor = go.Stone.White
+        else:
+            continue
 
-            winner = cells[3].string.strip()
-            if (challenger.startswith(winner)):
-                black = challenger if (victor == go.Stone.Black) else defender
-                white = challenger if (victor == go.Stone.White) else defender
-            elif (defender.startswith(winner)):
-                black = defender if (victor == go.Stone.Black) else challenger
-                white = defender if (victor == go.Stone.White) else challenger
-            else:
-                continue
+        winner = cells[3].string.strip()
+        if (challenger.startswith(winner)):
+            black = challenger if (victor == go.Stone.Black) else defender
+            white = challenger if (victor == go.Stone.White) else defender
+        elif (defender.startswith(winner)):
+            black = defender if (victor == go.Stone.Black) else challenger
+            white = defender if (victor == go.Stone.White) else challenger
+        else:
+            continue
 
-            id = match_game_id(cells[7]('a')[0]['href'])
+        id = match_game_id(cells[7]('a')[0]['href'])
 
-            games[id] = {
-                'id': id,
-                'match_id': match_id,
-                'client': int(cells[8].string.strip()),
-                'black': black,
-                'white': white,
-                'moves': int(cells[5].string.strip()),
-                'victor': victor,
-                'resign': outcome.endswith('Resign')
-            }
+        games[id] = {
+            'id': id,
+            'match_id': match_id,
+            'client': int(cells[8].string.strip()),
+            'black': black,
+            'white': white,
+            'moves': int(cells[5].string.strip()),
+            'victor': victor,
+            'resign': outcome.endswith('Resign')
+        }
 
-        return games
+    return games
 
 
 # Fetch all available data and store it in Sqlite
